@@ -5,10 +5,16 @@ backend/__pycache__/
 backend/*.pyc
 backend/venv/
 
+# Database
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+
 # Environment
 .env
 frontend/.env
 backend/.env
+.env.*
 
 # Build outputs
 frontend/build/
@@ -26,3 +32,9 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
