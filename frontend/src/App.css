@@ -7,7 +7,7 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #060b21 0%, #282729 100%);
   min-height: 100vh;
   color: #333;
 }
@@ -15,15 +15,16 @@ body {
 .App {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  width: 100%;
+  
 }
 
 .container {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  margin: 0 ;
+  display: flex;
+  flex-direction: column;
+  flex:1;
 }
 
 /* Card Styles */
@@ -237,23 +238,6 @@ body {
   margin: 5px 0;
 }
 
-/* Room Page Styles */
-.room-page {
-  color: white;
-  min-height: 100vh;
-}
-
-.room-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  backdrop-filter: blur(10px);
-}
-
 .room-details {
   display: flex;
   gap: 15px;
@@ -261,36 +245,7 @@ body {
   margin-top: 10px;
 }
 
-.user-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-}
 
-.user-role {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.user-role.host {
-  background: #ffd700;
-  color: #333;
-}
-
-.user-role.member {
-  background: #667eea;
-  color: white;
-}
-
-.room-content {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 20px;
-}
 
 /* Main Content */
 .main-content {
@@ -299,212 +254,6 @@ body {
   gap: 20px;
 }
 
-.current-song-section,
-.add-song-section,
-.queue-section {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-}
-
-.current-song-section h2,
-.add-song-section h2,
-.queue-section h2 {
-  margin-bottom: 15px;
-  color: white;
-}
-
-.current-song {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.song-info h3 {
-  font-size: 1.5rem;
-  margin-bottom: 5px;
-}
-
-.song-info p {
-  color: #ccc;
-  margin-bottom: 15px;
-}
-
-.no-song {
-  text-align: center;
-  color: #ccc;
-  padding: 40px 0;
-}
-
-.song-input-group {
-  display: flex;
-  gap: 10px;
-}
-
-.song-input-group .form-input {
-  flex: 1;
-}
-
-/* Song List */
-.song-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.song-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 15px;
-  border-radius: 8px;
-  transition: background 0.3s ease;
-}
-
-.song-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.song-position {
-  font-weight: bold;
-  color: #667eea;
-  min-width: 30px;
-}
-
-.song-details {
-  flex: 1;
-}
-
-.song-details h4 {
-  margin-bottom: 5px;
-}
-
-.song-details p {
-  color: #ccc;
-  margin-bottom: 3px;
-}
-
-.song-details small {
-  color: #999;
-}
-
-.vote-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.vote-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Sidebar */
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.members-section,
-.chat-section {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-}
-
-.members-section h3,
-.chat-section h3 {
-  margin-bottom: 15px;
-  color: white;
-}
-
-.member-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.member-item:last-child {
-  border-bottom: none;
-}
-
-.role {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  text-transform: uppercase;
-}
-
-.role.host {
-  background: #ffd700;
-  color: #333;
-}
-
-.role.member {
-  background: #667eea;
-  color: white;
-}
-
-/* Chat */
-.chat-messages {
-  height: 200px;
-  overflow-y: auto;
-  margin-bottom: 15px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-}
-
-.message {
-  margin-bottom: 8px;
-  padding: 5px 0;
-}
-
-.message.system {
-  font-style: italic;
-  color: #ccc;
-  font-size: 14px;
-}
-
-.message.chat strong {
-  color: #667eea;
-}
-
-.chat-input {
-  display: flex;
-  gap: 10px;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.chat-input input::placeholder {
-  color: #ccc;
-}
-
-.chat-input button {
-  padding: 8px 16px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
 
 /* Loading and Error States */
 .loading {
@@ -539,21 +288,5 @@ body {
     grid-template-columns: 1fr;
   }
   
-  .room-content {
-    grid-template-columns: 1fr;
-  }
   
-  .room-header {
-    flex-direction: column;
-    gap: 15px;
-    text-align: center;
-  }
-  
-  .song-input-group {
-    flex-direction: column;
-  }
-  
-  .auth-options {
-    flex-direction: column;
-  }
 }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import './RoomPage.css';
+import './webplayback.css';
 
-// Initial track state
 const track = {
     name: "",
     album: {
@@ -10,15 +11,21 @@ const track = {
     },
     artists: [
         { name: "" }
-    ]
+    ],
+    duration_ms: 0
 };
 
 function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
     const [player, setPlayer] = useState(undefined);
     const [is_paused, setPaused] = useState(false);
     const [is_active, setActive] = useState(false);
-    const [current_track, setTrack] = useState(track);
+    const [current_track, setTrack] = useState(currentSong || track);
     const [device_id, setDeviceId] = useState(null);
+    const [progress, setProgress] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [volume, setVolume] = useState(50);
+    const [isVolumeVisible, setIsVolumeVisible] = useState(false);
+    const [isSeeking, setIsSeeking] = useState(false);
 
     useEffect(() => {
         if (!accessToken) {
@@ -63,6 +70,8 @@ function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
 
                 setTrack(state.track_window.current_track);
                 setPaused(state.paused);
+                setProgress(state.position);
+                setDuration(state.duration);
 
                 player.getCurrentState().then(state => {
                     if (!state) {
@@ -118,6 +127,42 @@ function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
         }
     }, [currentSong, player, device_id, accessToken]);
 
+    const handleSeek = useCallback((value) => {
+        if (!player || !is_active) return;
+        
+        const position = Math.round((value / 100) * duration);
+        player.seek(position);
+        setProgress(position);
+    }, [player, is_active, duration]);
+
+    const handleVolumeChange = useCallback((value) => {
+        if (!player || !is_active) return;
+        
+        player.setVolume(value / 100);
+        setVolume(value);
+    }, [player, is_active]);
+
+    // Progress update interval
+    useEffect(() => {
+        if (!is_active || !player || is_paused || isSeeking) return;
+
+        const interval = setInterval(() => {
+            player.getCurrentState().then(state => {
+                if (state) {
+                    setProgress(state.position);
+                }
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [is_active, player, is_paused, isSeeking]);
+
+    const formatTime = (ms) => {
+        const minutes = Math.floor(ms / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
     if (!accessToken) {
         return <div className="player-error">No Spotify access token available</div>;
     }
@@ -148,17 +193,31 @@ function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
                         {current_track.artists[0].name}
                     </div>
 
+                    <div className="now-playing__progress">
+                        <span className="time">{formatTime(progress)}</span>
+                        <input
+                            type="range"
+                            className="progress-bar"
+                            value={(progress / duration) * 100 || 0}
+                            onChange={(e) => handleSeek(e.target.value)}
+                            onMouseDown={() => setIsSeeking(true)}
+                            onMouseUp={() => setIsSeeking(false)}
+                            disabled={!is_active}
+                        />
+                        <span className="time">{formatTime(duration)}</span>
+                    </div>
+
                     <div className="now-playing__controls">
                         <button 
                             className="btn-spotify" 
                             onClick={() => { player.previousTrack() }}
                             disabled={!is_active}
                         >
-                            &lt;&lt;
+                            <i className="fas fa-backward"></i>
                         </button>
 
                         <button 
-                            className="btn-spotify" 
+                            className="btn-spotify btn-spotify--play" 
                             onClick={() => { 
                                 player.togglePlay()
                                     .then(() => {
@@ -171,7 +230,7 @@ function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
                             }}
                             disabled={!is_active || !currentSong}
                         >
-                            {is_paused ? "PLAY" : "PAUSE"}
+                            <i className={`fas fa-${is_paused ? 'play' : 'pause'}`}></i>
                         </button>
 
                         <button 
@@ -182,8 +241,27 @@ function WebPlayback({ accessToken, currentSong, onNextSong, roomId, socket }) {
                             }}
                             disabled={!is_active}
                         >
-                            &gt;&gt;
+                            <i className="fas fa-forward"></i>
                         </button>
+
+                        <div className="volume-control">
+                            <button 
+                                className="btn-spotify btn-spotify--volume"
+                                onClick={() => setIsVolumeVisible(!isVolumeVisible)}
+                            >
+                                <i className={`fas fa-volume-${volume === 0 ? 'mute' : volume < 50 ? 'down' : 'up'}`}></i>
+                            </button>
+                            {isVolumeVisible && (
+                                <input
+                                    type="range"
+                                    className="volume-slider"
+                                    min="0"
+                                    max="100"
+                                    value={volume}
+                                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

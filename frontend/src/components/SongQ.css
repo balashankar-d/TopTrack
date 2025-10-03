@@ -1,0 +1,233 @@
+.songq-container {
+  grid-area: queue;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: calc(100vh - 5rem);
+  min-width: 500px;
+  width: 100%;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a6c #1a1a2e;
+}
+
+.songq-title {
+  color: #00ffff;
+  font-size: 2rem;
+  margin-bottom: 24px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.songq-empty {
+  text-align: center;
+  padding: 40px;
+  color: rgba(224, 224, 255, 0.6);
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 255, 255, 0.2);
+}
+
+.songq-list {
+  list-style: none;
+  padding-right: 8px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 255, 255, 0.3) rgba(0, 0, 0, 0.2);
+}
+
+/* Scrollbar styling */
+.songq-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.songq-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.songq-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.songq-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.5);
+}
+
+.songq-item {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.songq-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+}
+
+.songq-meta {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  gap: 24px;
+  width: 100%;
+}
+
+.songq-img {
+  width: 90px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.songq-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.songq-name {
+  color: #e0e0ff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.songq-artist {
+  color: rgba(224, 224, 255, 0.8);
+  font-size: 1rem;
+}
+
+.songq-album {
+  color: rgba(224, 224, 255, 0.6);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.songq-duration {
+  color: rgba(224, 224, 255, 0.5);
+  font-size: 0.85rem;
+  font-family: monospace;
+  margin-top: 4px;
+}
+
+.songq-votes {
+  color: #3a3f3f;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.songq-vote-btn {
+  background: transparent;
+  color: #c1c7c7;
+  border: 2px solid #d6e5e5;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  min-width: 100px;
+  position: relative;
+  overflow: hidden;
+}
+
+.songq-vote-btn:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.songq-vote-btn.voted {
+  background: #d6ffff;
+  color: #0f0f1a;
+  font-weight: bold;
+}
+
+.songq-vote-btn.voted:hover {
+  background: #e6fdfd;
+}
+
+/* Animation for vote button */
+@keyframes voteGlow {
+  0% {
+    box-shadow: 0 0 5px rgba(126, 147, 147, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+  }
+}
+
+.songq-vote-btn {
+  animation: voteGlow 0.5s infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .songq-container {
+    padding: 16px;
+    margin: 10px;
+  }
+
+  .songq-meta {
+    flex-direction: column;
+    text-align: center;
+    padding: 12px;
+  }
+
+  .songq-img {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+  }
+
+  .songq-info {
+    align-items: center;
+    margin: 12px 0;
+  }
+
+  .songq-vote-btn {
+    width: 100%;
+    margin-top: 12px;
+  }
+}
+
+/* Hover Effects */
+.songq-item:hover .songq-name {
+  color: #00ffff;
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+}
+
+.songq-item:hover .songq-img {
+  transform: scale(1.05);
+  transition: transform 0.3s ease;
+}

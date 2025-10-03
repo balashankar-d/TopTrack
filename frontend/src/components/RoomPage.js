@@ -5,6 +5,7 @@ import axios from 'axios';
 import SongQ from './SongQ';
 import WebPlayback from './webplayback';
 import { v4 as uuidv4 } from 'uuid';
+import './RoomPage.css';
 
 // Spotify token management
 export const getSpotifyToken = async (roomId) => {
@@ -374,7 +375,7 @@ const RoomPage = () => {
         clearTimeout(tokenRefreshTimeoutRef.current);
       }
     };
-  }, [roomId, userRole, tokenExpiresAt]);
+  }, [roomId, userRole]);
 
   // Memoize getTopVotedSong function
   const getTopVotedSong = useCallback((queue) => {
@@ -516,12 +517,19 @@ const RoomPage = () => {
   return (
     <div className="room-page">
       <div className="room-header">
-        <h1>{room?.name || 'Music Room'}</h1>
-        <p>Room ID: {roomId}</p>
-        <p>Welcome, {username}! ({userRole})</p>
+        <div className="header-content">
+          <h1>{room?.name || 'Music Room'}</h1>
+          <p>Room ID: {roomId}</p>
+          <p>Welcome, {username}! ({userRole})</p>
+        </div>
+        <div className="leave-room">
+          <button onClick={handleLeaveRoom}>Leave Room</button>
+        </div>
       </div>
 
       {/* Current Song Section */}
+    <div className='main-content'>
+    <div className="top-section">
       <div className="current-song">
         <h2>Now Playing</h2>
         {userRole === 'host' ? (
@@ -555,20 +563,16 @@ const RoomPage = () => {
           <button onClick={handleAddSong}>Add to Queue</button>
         </div>
       </div>
-
+    </div>
+    </div>
       {/* Song Queue Section */}
       {socketRef.current && <SongQ 
         roomId={roomId} 
         userId={userId} 
         socket={socketRef.current}
-        
       />}
-
-      {/* Leave Room Button - Always visible */}
-      <div className="leave-room">
-        <button onClick={handleLeaveRoom}>Leave Room</button>
-      </div>
-    </div>
+    
+  </div>
   );
 };
 

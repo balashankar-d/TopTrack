@@ -107,7 +107,6 @@ const SongQ = ({ roomId, userId, socket }) => {
 
   return (
     <div className="songq-container">
-      <h2 className="songq-title">Song Queue</h2>
       {songs.length === 0 ? (
         <div className="songq-empty">No songs in queue</div>
       ) : (
