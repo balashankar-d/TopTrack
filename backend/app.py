@@ -580,6 +580,7 @@ def handle_vote_song(data):
                 prev_song.vote_count -= 1
             db.session.delete(previous_vote)
             changed = True
+            emit('song_voted', {'user_id': user_id, 'room_id': room_id, 'song_id': prev_song.id, 'vote_type': 'removed', 'vote_count': prev_song.vote_count if prev_song else 0}, room=room_id)
         elif previous_vote.song_id == song_id:
             # If voting for same song, remove vote (toggle off)
             song = Song.query.filter_by(id=song_id).first()

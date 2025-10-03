@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 const JoinRoom = () => {
   const [roomInput, setRoomInput] = useState('');
@@ -42,11 +43,16 @@ const JoinRoom = () => {
         return;
       }
 
-      // Generate user ID and store user info
-      const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('userId', userId);
-      localStorage.setItem('username', username);
-      localStorage.setItem('userRole', 'member');
+      // Generate a unique user ID using UUID v4
+      const userId = uuidv4();
+
+      // Store user info in sessionStorage to keep it tab-specific
+      sessionStorage.setItem('userId', userId);
+      sessionStorage.setItem('username', username);
+      sessionStorage.setItem('userRole', 'member');
+
+      // Store room info in localStorage since it's shared across tabs
+      localStorage.setItem('roomId', roomId);
 
       // Navigate to room
       navigate(`/room/${roomId}`);

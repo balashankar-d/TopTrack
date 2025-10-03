@@ -22,10 +22,6 @@ const SongQ = ({ roomId, userId, socket }) => {
             setSongs(data.songs || []);
             setLoading(false);
 
-            if (data.songs) {
-                const votedSong = data.songs.find(song => song.voted_by && song.voted_by.includes(userId));
-                setUserVoteSongId(votedSong ? votedSong.id : null);
-            }
         } catch (error) {
             console.error('[Queue] Failed to fetch:', error);
             setLoading(false);
@@ -51,19 +47,26 @@ const SongQ = ({ roomId, userId, socket }) => {
     };
 
     const handleSongVoted = (data) => {
-        console.log('[Socket.IO] Vote event received:', data);
-        setSongs(prev => {
-            const updated = prev.map(song =>
-                song.id === data.song_id ? { ...song, vote_count: data.vote_count } : song
-            );
-            // Sort by vote count after updating
-            return updated.sort((a, b) => b.vote_count - a.vote_count);
-        });
+    console.log('[Socket.IO] Vote event received:', data);
+    
+    setSongs(prev => {
+        let updated = [...prev];
+        
+        // Update the vote count for the current song
+        updated = updated.map(song =>
+            song.id === data.song_id 
+                ? { ...song, vote_count: data.vote_count }
+                : song
+        );
 
-        if (data.user_id === userId) {
-            setUserVoteSongId(data.vote_type === 'removed' ? null : data.song_id);
-        }
-    };
+        // Sort by vote count after updating
+        return updated.sort((a, b) => b.vote_count - a.vote_count);
+    });
+
+    // Update the user's current vote
+    if (data.user_id === userId) {
+        setUserVoteSongId(data.vote_type === 'removed' ? null : data.song_id);
+    }};
 
     // Fetch initial queue
     fetchQueue();
@@ -80,51 +83,25 @@ const SongQ = ({ roomId, userId, socket }) => {
     };
   }, [roomId, userId, socket]);
 
-  const handleVote = async (songId) => {
+ const handleVote = async (songId) => {
     if (!socket) {
         console.error('[Vote] No socket connection available');
         return;
     }
-
     try {
-        // Case 1: User is clicking the same song they already voted for
-        if (userVoteSongId === songId) {
-            console.log('[Vote] Removing vote from current song:', songId);
-            socket.emit('vote_song', {
-                room_id: roomId,
-                song_id: songId,
-                user_id: userId,
-                vote_type: 'remove'
-            });
-            setUserVoteSongId(null);
-        }
-        // Case 2: User is voting for a different song
-        else {
-            // First remove vote from previously voted song if exists
-            if (userVoteSongId) {
-                console.log('[Vote] Removing vote from previous song:', userVoteSongId);
-                socket.emit('vote_song', {
-                    room_id: roomId,
-                    song_id: userVoteSongId,
-                    user_id: userId,
-                    vote_type: 'remove'
-                });
-            }
-
-            // Then add vote to new song
-            console.log('[Vote] Adding vote to new song:', songId);
-            socket.emit('vote_song', {
-                room_id: roomId,
-                song_id: songId,
-                user_id: userId,
-                vote_type: 'up'
-            });
-            setUserVoteSongId(songId);
-        }
+        // Single emit for all cases - backend handles the logic
+        console.log('[Vote] Processing vote for song:', songId);
+        socket.emit('vote_song', {
+            room_id: roomId,
+            song_id: songId,
+            user_id: userId
+        });
+        // Local state will be updated when we receive the 'song_voted' event
+        // This ensures UI stays in sync with server state
     } catch (error) {
         console.error('[Vote] Error handling vote:', error);
     }
-};
+  };
 
   if (loading) return <div className="songq-loading">Loading queue...</div>;
 

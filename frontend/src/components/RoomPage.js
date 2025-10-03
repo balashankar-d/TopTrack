@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import SongQ from './SongQ';
 import WebPlayback from './webplayback';
+import { v4 as uuidv4 } from 'uuid';
 
 // Spotify token management
 export const getSpotifyToken = async (roomId) => {
@@ -32,62 +33,351 @@ const RoomPage = () => {
   const [searchParams] = useSearchParams();
   const [room, setRoom] = useState(null);
   const [currentSong, setCurrentSong] = useState(null);
-  const [queueData, setQueue] = useState([]); // Add state for queue
+  const [queue, setQueue] = useState([]);
   const [songInput, setSongInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [userId, setUserId] = useState('');
-  const [username, setUsername] = useState('');
-  const [userRole, setUserRole] = useState('member');
+  
+  // Initialize user state from sessionStorage
+  const [userId, setUserId] = useState(() => sessionStorage.getItem('userId'));
+  const [username, setUsername] = useState(() => sessionStorage.getItem('username'));
+  const [userRole, setUserRole] = useState(() => sessionStorage.getItem('userRole') || 'member');
+  
   const [spotifyToken, setSpotifyToken] = useState(null);
   const [tokenExpiresAt, setTokenExpiresAt] = useState(null);
+  const [isLeaving, setIsLeaving] = useState(false);
 
-  // Handle Spotify success redirect
+  // Use ref to persist socket instance and other values
+  const socketRef = useRef(null);
+  const tokenRefreshTimeoutRef = useRef(null);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (socketRef.current) {
+      console.log('[Cleanup] Disconnecting socket and leaving room');
+      socketRef.current.emit('leave_room', { 
+        room_id: roomId, 
+        user_id: userId 
+      });
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+  }, [roomId, userId]);
+
+  // Navigation confirmation
   useEffect(() => {
-    console.log('=== ROOM PAGE LOADED ===');
-    console.log('Room ID from params:', roomId);
-    console.log('Current URL:', window.location.href);
-    console.log('Search params:', Object.fromEntries(searchParams));
-    console.log('========================');
+    const handleBeforeUnload = (e) => {
+      if (!isLeaving && socketRef.current?.connected) {
+        cleanup();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      cleanup();
+    };
+  }, [cleanup, isLeaving]);
+
+  // Validate user session
+  useEffect(() => {
+    console.log('[Auth] Checking user session:', {
+      userId,
+      username,
+      userRole,
+      isSpotifyAuth: searchParams.get('auth_success') === 'true'
+    });
 
     const spotifyUser = searchParams.get('spotify_user');
     const displayName = searchParams.get('display_name');
     const authSuccess = searchParams.get('auth_success');
 
     if (authSuccess === 'true' && spotifyUser && displayName) {
-      console.log('Spotify auth success detected');
+      console.log('[Auth] Spotify auth success detected');
       
-      // Store user info in state and localStorage
+      // Store host info in sessionStorage
+      sessionStorage.setItem('userId', spotifyUser);
+      sessionStorage.setItem('username', displayName);
+      sessionStorage.setItem('userRole', 'host');
+      
       setUserId(spotifyUser);
       setUsername(displayName);
       setUserRole('host');
       
-      localStorage.setItem('userId', spotifyUser);
-      localStorage.setItem('username', displayName);
-      localStorage.setItem('userRole', 'host');
-      
       // Clean up URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
-      // Try to get user info from localStorage
-      const storedUserId = localStorage.getItem('userId');
-      const storedUsername = localStorage.getItem('username');
-      const storedUserRole = localStorage.getItem('userRole');
-      
-      if (storedUserId && storedUsername) {
-        setUserId(storedUserId);
-        setUsername(storedUsername);
-        setUserRole(storedUserRole || 'member');
-      } else {
-        // No user info available, redirect to join page
+      // Check for existing user session
+      const storedUserId = sessionStorage.getItem('userId');
+      const storedUsername = sessionStorage.getItem('username');
+      const storedRole = sessionStorage.getItem('userRole');
+
+      console.log('[Auth] Checking stored session:', {
+        storedUserId,
+        storedUsername,
+        storedRole
+      });
+
+      if (!storedUserId || !storedUsername) {
+        // No valid user session, redirect to join page
+        console.log('[Auth] No valid user session, redirecting to join page');
         navigate(`/join?room_id=${roomId}`);
         return;
       }
+
+      // Valid session found, update state
+      setUserId(storedUserId);
+      setUsername(storedUsername);
+      setUserRole(storedRole || 'member');
+
+      console.log('[Auth] Using stored session:', {
+        userId: storedUserId,
+        username: storedUsername,
+        role: storedRole || 'member'
+      });
     }
   }, [searchParams, roomId, navigate]);
 
-  // Helper function to get most voted song from queue
-  const getTopVotedSong = (queue) => {
+  // Socket initialization with proper dependencies
+  useEffect(() => {
+    if (!userId || !username || !roomId || !userRole) {
+      console.log('[Socket.IO] Missing required info, skipping connection');
+      return;
+    }
+    
+    if (socketRef.current?.connected) {
+      console.log('[Socket.IO] Socket already connected');
+      return;
+    }
+
+    console.log('[Socket.IO] Initializing connection:', {
+      userId,
+      username,
+      roomId,
+      userRole
+    });
+
+    const socket = io("http://127.0.0.1:5000", {
+      transports: ['websocket'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      autoConnect: false
+    });
+
+    // Socket event handlers
+    socket.on('connect', () => {
+      console.log('[Socket.IO] Connected:', socket.id);
+      socket.emit('join_room', {
+        room_id: roomId,
+        user_id: userId,
+        username: username,
+        role: userRole
+      });
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('[Socket.IO] Disconnected:', {
+        reason,
+        socketId: socket.id,
+        wasConnected: socket.connected
+      });
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[Socket.IO] Connection error:', {
+        message: err.message,
+        type: err.type,
+        description: err.description
+      });
+    });
+
+    socket.on('error', (data) => {
+      console.error('[Socket.IO] Socket error:', {
+        error: data,
+        socketId: socket.id,
+        roomId
+      });
+      setError(data.message || 'A socket error occurred');
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('[Socket.IO] Reconnection attempt:', {
+        attempt: attemptNumber,
+        transport: socket.io.engine?.transport?.name
+      });
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('[Socket.IO] Reconnected after attempts:', attemptNumber);
+    });
+
+    socket.on('user_joined', (data) => {
+      console.log('[Socket.IO] User joined event:', {
+        data,
+        roomId,
+        currentUserId: userId
+      });
+      setRoom(data.room || { id: roomId, name: data.room_name || 'Unknown Room' });
+      setCurrentSong(data.current_song);
+      setIsLoading(false);
+    });
+
+    // Add new handlers for queue and playback
+    socket.on('next_song', (data) => {
+      console.log('[Socket.IO] New song added:', data);
+      // Update current song when queue changes
+      if (data.current_song) {
+        const formattedTrack = {
+          uri: `spotify:track:${data.current_song.spotify_track_id}`,
+          title: data.current_song.title,
+          artist: data.current_song.artist,
+          albumArt: data.current_song.image_url,
+          duration_ms: data.current_song.duration_ms
+        };
+        setCurrentSong(formattedTrack);
+      }
+    });
+
+    // Queue and vote update handlers
+    socket.on('queue_updated', (data) => {
+      console.log('[Socket.IO] Queue updated:', data);
+      setQueue(data.queue || []);
+      
+      // Check if current song should change based on votes
+      const topSong = getTopVotedSong(data.queue);
+      if (topSong && (!currentSong || topSong.uri !== currentSong.uri)) {
+        console.log('[Queue] Top voted song changed:', topSong);
+        if (userRole === 'host') {
+          // Host will update the current song
+          setCurrentSong(topSong);
+        }
+      }
+    });
+
+    socket.on('vote_updated', (data) => {
+      console.log('[Socket.IO] Vote updated:', data);
+      setQueue(data.queue || []);
+      
+      // If this affects the current song, update it
+      if (data.queue_changed && data.current_song) {
+        const formattedTrack = {
+          uri: `spotify:track:${data.current_song.spotify_track_id}`,
+          title: data.current_song.title,
+          artist: data.current_song.artist,
+          albumArt: data.current_song.image_url,
+          duration_ms: data.current_song.duration_ms,
+          votes: data.current_song.voted_by ? data.current_song.voted_by.length : 0
+        };
+        if (userRole === 'host' || !currentSong) {
+          setCurrentSong(formattedTrack);
+        }
+      }
+    });
+
+    // Add user role specific handlers
+    if (userRole === 'host') {
+      socket.on('next_song_needed', () => {
+        console.log('[Socket.IO] Next song needed (Host)');
+        socket.emit('get_next_song', {
+          room_id: roomId,
+          user_id: userId
+        });
+      });
+    } else {
+      // Non-host users just update their display when song changes
+      socket.on('song_changed', (data) => {
+        console.log('[Socket.IO] Song changed (Member):', data);
+        if (data.current_song) {
+          const formattedTrack = {
+            uri: `spotify:track:${data.current_song.spotify_track_id}`,
+            title: data.current_song.title,
+            artist: data.current_song.artist,
+            albumArt: data.current_song.image_url,
+            duration_ms: data.current_song.duration_ms,
+            votes: data.current_song.voted_by ? data.current_song.voted_by.length : 0
+          };
+          setCurrentSong(formattedTrack);
+        }
+      });
+    }
+
+    // Store socket in ref and connect
+    socketRef.current = socket;
+    socket.connect();
+
+    return () => cleanup();
+  }, [userId, username, roomId, userRole, cleanup]);
+
+  // Handle room leave
+  const handleLeaveRoom = useCallback(async () => {
+    const confirmed = window.confirm('Are you sure you want to leave this room?');
+    if (!confirmed) return;
+
+    setIsLeaving(true);
+    cleanup();
+
+    // Clear user session but keep room info
+    sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('username');
+    sessionStorage.removeItem('userRole');
+
+    navigate('/');
+  }, [navigate, cleanup]);
+
+  // Token management with proper dependencies
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const tokenData = await getSpotifyToken(roomId);
+        if (tokenData) {
+          setSpotifyToken(tokenData.accessToken);
+          setTokenExpiresAt(Date.now() + tokenData.expiresIn * 1000);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error fetching Spotify token:', error);
+        setError('Failed to get Spotify access token');
+        return false;
+      }
+    };
+
+    const setupTokenRefresh = () => {
+      if (tokenRefreshTimeoutRef.current) {
+        clearTimeout(tokenRefreshTimeoutRef.current);
+      }
+
+      if (!tokenExpiresAt) return;
+
+      const now = Date.now();
+      const refreshDelay = Math.max(0, tokenExpiresAt - now - 5 * 60 * 1000); // 5 minutes before expiry
+      console.log(`[Spotify] Setting token refresh in ${refreshDelay/1000} seconds`);
+
+      tokenRefreshTimeoutRef.current = setTimeout(fetchToken, refreshDelay);
+    };
+
+    // Initial token fetch
+    if (roomId && userRole === 'host') {
+      fetchToken().then(() => {
+        if (tokenExpiresAt) {
+          setupTokenRefresh();
+        }
+      });
+    }
+
+    return () => {
+      if (tokenRefreshTimeoutRef.current) {
+        clearTimeout(tokenRefreshTimeoutRef.current);
+      }
+    };
+  }, [roomId, userRole, tokenExpiresAt]);
+
+  // Memoize getTopVotedSong function
+  const getTopVotedSong = useCallback((queue) => {
     if (!queue || queue.length === 0) return null;
     
     // Sort queue by votes in descending order
@@ -104,230 +394,41 @@ const RoomPage = () => {
       title: topSong.title,
       artist: topSong.artist,
       albumArt: topSong.image_url,
-      duration_ms: topSong.duration_ms
+      duration_ms: topSong.duration_ms,
+      votes: topSong.voted_by ? topSong.voted_by.length : 0
     } : null;
-  };
+  }, []);
 
-  // Use ref to persist socket instance
-  const socketRef = useRef(null);
+  // Memoize fetchQueue function
+  const fetchQueue = useCallback(async () => {
+    if (!roomId) return;
 
-  // Initialize socket connection ONCE
-  useEffect(() => {
-    if (!userId || !username) {
-      console.log('[Socket.IO] Missing userId or username, skipping connection');
-      return;
-    }
-    
-    // Check ref instead of state
-    if (socketRef.current) {
-      console.log('[Socket.IO] Socket already exists in ref, skipping creation');
-      return;
-    }
-
-    console.log('[Socket.IO] Initializing socket connection:', {
-      userId,
-      username,
-      roomId,
-      backendUrl: 'http://127.0.0.1:5000'
-    });
-
-    // Use recommended options for Flask-SocketIO compatibility
-    const newSocket = io("http://127.0.0.1:5000", {
-      transports: ['websocket'],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000, // Increased timeout
-      autoConnect: false // Don't connect automatically
-    });
-
-    // Set up event handlers before connecting
-    newSocket.on('connect', () => {
-      console.log('[Socket.IO] Connected successfully:', {
-        socketId: newSocket.id,
-        transport: newSocket.io.engine.transport.name
-      });
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/room/${roomId}/queue`);
+      const data = await response.json();
+      console.log("[Queue] Fetched queue:", data);
+      setQueue(data.queue || []);
       
-      // Join room immediately after connection
-      console.log('[Socket.IO] Joining room:', roomId);
-      newSocket.emit('join_room', {
-        room_id: roomId,
-        user_id: userId,
-        username: username
-      });
-    });
-
-    newSocket.on('disconnect', (reason) => {
-      console.log('[Socket.IO] Disconnected:', {
-        reason,
-        socketId: newSocket.id,
-        wasConnected: newSocket.connected
-      });
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.error('[Socket.IO] Connection error:', {
-        message: err.message,
-        type: err.type,
-        description: err.description
-      });
-    });
-
-    newSocket.on('error', (data) => {
-      console.error('[Socket.IO] Socket error:', {
-        error: data,
-        socketId: newSocket.id,
-        roomId
-      });
-      setError(data.message || 'A socket error occurred');
-    });
-
-    newSocket.on('reconnect_attempt', (attemptNumber) => {
-      console.log('[Socket.IO] Reconnection attempt:', {
-        attempt: attemptNumber,
-        transport: newSocket.io.engine?.transport?.name
-      });
-    });
-
-    newSocket.on('reconnect', (attemptNumber) => {
-      console.log('[Socket.IO] Reconnected after attempts:', attemptNumber);
-    });
-
-    newSocket.on('user_joined', (data) => {
-      console.log('[Socket.IO] User joined event:', {
-        data,
-        roomId,
-        currentUserId: userId
-      });
-      setRoom(data.room || { id: roomId, name: data.room_name || 'Unknown Room' });
-      setCurrentSong(data.current_song);
-      setIsLoading(false);
-    });
-
-    // Add new handlers for queue and playback
-    newSocket.on('next_song', (data) => {
-      console.log('[Socket.IO] New song added:', data);
-      // Update current song when queue changes
-      if (data.current_song) {
-        const formattedTrack = {
-          uri: `spotify:track:${data.current_song.spotify_track_id}`,
-          title: data.current_song.title,
-          artist: data.current_song.artist,
-          albumArt: data.current_song.image_url,
-          duration_ms: data.current_song.duration_ms
-        };
-        setCurrentSong(formattedTrack);
-      }
-    });
-
-    newSocket.on('next_song_needed', () => {
-      console.log('[Socket.IO] Next song needed');
-      // Request the next song from queue based on votes
-      newSocket.emit('get_next_song', {
-        room_id: roomId,
-        user_id: userId
-      });
-    });
-
-    // Add vote handler in socket setup
-    newSocket.on('vote_updated', (data) => {
-      console.log('[Socket.IO] Vote updated:', data);
-      // If this affects the current song, update it
-      if (data.queue_changed && data.current_song) {
-        const formattedTrack = {
-          uri: `spotify:track:${data.current_song.spotify_track_id}`,
-          title: data.current_song.title,
-          artist: data.current_song.artist,
-          albumArt: data.current_song.image_url,
-          duration_ms: data.current_song.duration_ms
-        };
-        setCurrentSong(formattedTrack);
-      }
-    });
-
-    // Store socket in ref only
-    socketRef.current = newSocket;
-
-    // Connect after all handlers are set up
-    console.log('[Socket.IO] Connecting socket...');
-    newSocket.connect();
-
-    return () => {
-      console.log('[Socket.IO] Cleanup: checking socket state');
-      if (socketRef.current) {
-        console.log('[Socket.IO] Cleaning up socket connection:', {
-          socketId: socketRef.current.id,
-          roomId,
-          wasConnected: socketRef.current.connected
-        });
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
-  }, [roomId, userId, username]); // Removed socket from dependencies
-  
-  // Spotify token management
-  useEffect(() => {
-    let tokenRefreshTimeout;
-
-    const fetchToken = async () => {
-      try {
-        const tokenData = await getSpotifyToken(roomId);
-        if (tokenData) {
-          setSpotifyToken(tokenData.accessToken);
-          setTokenExpiresAt(tokenData.expiresIn);
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Error fetching Spotify token:', error);
-        setError('Failed to get Spotify access token');
-        return false;
-      }
-    };
-
-    const setupTokenRefresh = (expiresIn) => {
-      // Clear any existing timeout
-      if (tokenRefreshTimeout) {
-        clearTimeout(tokenRefreshTimeout);
-      }
-
-      // Calculate when to refresh (5 minutes before expiration)
-      const refreshDelay = Math.max(0, (expiresIn - 300) * 1000);
-      console.log(`[Spotify] Setting token refresh in ${refreshDelay/1000} seconds`);
-
-      tokenRefreshTimeout = setTimeout(async () => {
-        console.log('[Spotify] Token refresh triggered');
-        const success = await fetchToken();
-        if (success) {
-          console.log('[Spotify] Token refreshed successfully');
-        }
-      }, refreshDelay);
-    };
-
-    const initializeToken = async () => {
-      if (roomId) {
-        const success = await fetchToken();
-        if (success && tokenExpiresAt) {
-          setupTokenRefresh(tokenExpiresAt);
+      // Set initial current song from queue only if there isn't one
+      if (!currentSong) {
+        const topSong = getTopVotedSong(data.queue);
+        if (topSong) {
+          console.log("[Queue] Setting initial current song:", topSong);
+          setCurrentSong(topSong);
         }
       }
-    };
+    } catch (error) {
+      console.error("[Queue] Error fetching queue:", error);
+      setError('Failed to fetch song queue');
+    }
+  }, [roomId, currentSong, getTopVotedSong]);
 
-    initializeToken();
+  // Extract song data from URL
+  const extractSongData = useCallback(async (url) => {
+    if (!url.includes('spotify.com/track/')) {
+      throw new Error('Please enter a valid Spotify track URL');
+    }
 
-    return () => {
-      if (tokenRefreshTimeout) {
-        clearTimeout(tokenRefreshTimeout);
-      }
-    };
-  }, [roomId]);
-
-  const extractSongData = async (url) => {
-  // If it's a Spotify track, get info from backend
-  if (url.includes('spotify.com/track/')) {
     try {
       const response = await axios.post('http://127.0.0.1:5000/api/spotify/track-info', {
         spotify_url: url,
@@ -346,39 +447,37 @@ const RoomPage = () => {
       };
     } catch (error) {
       console.error('Failed to get Spotify track info:', error);
-      
-      // Fallback to basic extraction
-      const trackId = url.split('/track/')[1]?.split('?')[0];
-      return {
-        title: 'Spotify Track (Info unavailable)',
-        artist: 'Unknown Artist',
-        spotify_url: url,
-        spotify_track_id: trackId
-      };
+      throw new Error('Failed to get track information from Spotify');
     }
-  }
+  }, [roomId]);
 
-};
+  // Handle adding songs to queue
+  const handleAddSong = useCallback(async () => {
+    if (!songInput.trim() || !socketRef.current) return;
 
-// Update handleAddSong to be async
-const handleAddSong = async () => {
-  if (!songInput.trim()) return;
-
-  try {
-    setIsLoading(true); // You might want to add loading state for song addition
-    
-    await extractSongData(songInput);
-
-    setSongInput('');
-  } catch (error) {
-    setError('Failed to add song');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    try {
+      setIsLoading(true);
+      const songData = await extractSongData(songInput);
+      
+      if (songData) {
+        console.log('[Queue] Adding song to queue:', songData);
+        socketRef.current.emit('add_song', {
+          room_id: roomId,
+          user_id: userId,
+          song: songData
+        });
+        setSongInput('');
+      }
+    } catch (error) {
+      console.error('[Queue] Failed to add song:', error);
+      setError('Failed to add song to queue');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [songInput, roomId, userId, extractSongData]);
 
   // Update handleNextSong to request next song from queue
-  const handleNextSong = () => {
+  const handleNextSong = useCallback(() => {
     if (userRole === 'host' && socketRef.current) {
       console.log('[Socket.IO] Requesting next song from queue');
       socketRef.current.emit('get_next_song', {
@@ -386,33 +485,14 @@ const handleAddSong = async () => {
         user_id: userId
       });
     }
-  };
+  }, [roomId, userId, userRole]);
 
-  // Function to fetch current queue
-  const fetchQueue = async () => {
-    try {
-      const response = await fetch(`http://127.0.0.1:5000/api/room/${roomId}/queue`);
-      const data = await response.json();
-      console.log("Fetched queue:", data);
-      setQueue(data.queue);
-      
-      // Set initial current song from queue
-      const topSong = getTopVotedSong(data.queue);
-      if (topSong && (!currentSong || topSong.uri !== currentSong.uri)) {
-        console.log("Setting initial current song:", topSong);
-        setCurrentSong(topSong);
-      }
-    } catch (error) {
-      console.error("Error fetching queue:", error);
-    }
-  };
-
-  // Fetch queue when component mounts or room code changes
+  // Cleanup on unmount
   useEffect(() => {
-    if (roomId) {
-      fetchQueue();
-    }
-  }, [roomId]);
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   if (isLoading) {
     return (
@@ -484,6 +564,10 @@ const handleAddSong = async () => {
         
       />}
 
+      {/* Leave Room Button - Always visible */}
+      <div className="leave-room">
+        <button onClick={handleLeaveRoom}>Leave Room</button>
+      </div>
     </div>
   );
 };
