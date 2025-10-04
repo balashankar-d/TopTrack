@@ -75,11 +75,13 @@ const SongQ = ({ roomId, userId, socket }) => {
     socket.on('song_added', handleSongAdded);
     socket.on('song_voted', handleSongVoted);
 
+
     // Cleanup function
     return () => {
         console.log('[Socket.IO] Cleaning up SongQ listeners');
         socket.off('song_added', handleSongAdded);
         socket.off('song_voted', handleSongVoted);
+      
     };
   }, [roomId, userId, socket]);
 

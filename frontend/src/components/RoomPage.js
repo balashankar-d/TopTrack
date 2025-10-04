@@ -34,7 +34,6 @@ const RoomPage = () => {
   const [searchParams] = useSearchParams();
   const [room, setRoom] = useState(null);
   const [currentSong, setCurrentSong] = useState(null);
-  const [queue, setQueue] = useState([]);
   const [songInput, setSongInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,6 +138,34 @@ const RoomPage = () => {
     }
   }, [searchParams, roomId, navigate]);
 
+  // Define event handlers using useCallback to maintain reference stability
+  const handleNextSong = useCallback((data) => {
+    console.log('[Socket.IO] Next song event received:', {
+      data,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (data.current_song) {
+      const formattedTrack = {
+        uri: `spotify:track:${data.current_song.spotify_track_id}`,
+        title: data.current_song.title,
+        artist: data.current_song.artist,
+        albumArt: data.current_song.image_url,
+        duration_ms: data.current_song.duration_ms
+      };
+      console.log('[Playback] Updating current song to:', formattedTrack);
+      setCurrentSong(formattedTrack);
+    }
+  }, []);
+
+  const handleAnyEvent = useCallback((eventName, ...args) => {
+    console.log('[Socket.IO] Event received:', {
+      event: eventName,
+      args,
+      timestamp: new Date().toISOString()
+    });
+  }, []);
+
   // Socket initialization with proper dependencies
   useEffect(() => {
     if (!userId || !username || !roomId || !userRole) {
@@ -227,10 +254,14 @@ const RoomPage = () => {
       setIsLoading(false);
     });
 
-    // Add new handlers for queue and playback
+    // Set up event handlers
     socket.on('next_song', (data) => {
-      console.log('[Socket.IO] New song added:', data);
-      // Update current song when queue changes
+      console.log('[Socket.IO] Next song event received:', {
+        data,
+        socketId: socket.id,
+        timestamp: new Date().toISOString()
+      });
+      
       if (data.current_song) {
         const formattedTrack = {
           uri: `spotify:track:${data.current_song.spotify_track_id}`,
@@ -239,78 +270,33 @@ const RoomPage = () => {
           albumArt: data.current_song.image_url,
           duration_ms: data.current_song.duration_ms
         };
+        console.log('[Playback] Updating current song to:', formattedTrack);
         setCurrentSong(formattedTrack);
       }
     });
 
-    // Queue and vote update handlers
-    socket.on('queue_updated', (data) => {
-      console.log('[Socket.IO] Queue updated:', data);
-      setQueue(data.queue || []);
-      
-      // Check if current song should change based on votes
-      const topSong = getTopVotedSong(data.queue);
-      if (topSong && (!currentSong || topSong.uri !== currentSong.uri)) {
-        console.log('[Queue] Top voted song changed:', topSong);
-        if (userRole === 'host') {
-          // Host will update the current song
-          setCurrentSong(topSong);
-        }
-      }
-    });
-
-    socket.on('vote_updated', (data) => {
-      console.log('[Socket.IO] Vote updated:', data);
-      setQueue(data.queue || []);
-      
-      // If this affects the current song, update it
-      if (data.queue_changed && data.current_song) {
-        const formattedTrack = {
-          uri: `spotify:track:${data.current_song.spotify_track_id}`,
-          title: data.current_song.title,
-          artist: data.current_song.artist,
-          albumArt: data.current_song.image_url,
-          duration_ms: data.current_song.duration_ms,
-          votes: data.current_song.voted_by ? data.current_song.voted_by.length : 0
-        };
-        if (userRole === 'host' || !currentSong) {
-          setCurrentSong(formattedTrack);
-        }
-      }
-    });
-
-    // Add user role specific handlers
-    if (userRole === 'host') {
-      socket.on('next_song_needed', () => {
-        console.log('[Socket.IO] Next song needed (Host)');
-        socket.emit('get_next_song', {
-          room_id: roomId,
-          user_id: userId
-        });
+    socket.onAny((eventName, ...args) => {
+      console.log('[Socket.IO] Event received:', {
+        event: eventName,
+        args,
+        socketId: socket.id,
+        timestamp: new Date().toISOString()
       });
-    } else {
-      // Non-host users just update their display when song changes
-      socket.on('song_changed', (data) => {
-        console.log('[Socket.IO] Song changed (Member):', data);
-        if (data.current_song) {
-          const formattedTrack = {
-            uri: `spotify:track:${data.current_song.spotify_track_id}`,
-            title: data.current_song.title,
-            artist: data.current_song.artist,
-            albumArt: data.current_song.image_url,
-            duration_ms: data.current_song.duration_ms,
-            votes: data.current_song.voted_by ? data.current_song.voted_by.length : 0
-          };
-          setCurrentSong(formattedTrack);
-        }
-      });
-    }
+    });
 
     // Store socket in ref and connect
     socketRef.current = socket;
     socket.connect();
 
-    return () => cleanup();
+    return () => {
+      if (socket) {
+        console.log('[Socket.IO] Cleaning up event listeners and socket connection');
+        socket.off('next_song');
+        socket.offAny();
+        socket.disconnect();
+      }
+      cleanup();
+    };
   }, [userId, username, roomId, userRole, cleanup]);
 
   // Handle room leave
@@ -377,52 +363,7 @@ const RoomPage = () => {
     };
   }, [roomId, userRole]);
 
-  // Memoize getTopVotedSong function
-  const getTopVotedSong = useCallback((queue) => {
-    if (!queue || queue.length === 0) return null;
-    
-    // Sort queue by votes in descending order
-    const sortedQueue = [...queue].sort((a, b) => {
-      const votesA = a.voted_by ? a.voted_by.length : 0;
-      const votesB = b.voted_by ? b.voted_by.length : 0;
-      return votesB - votesA;
-    });
 
-    // Return the first song (most voted)
-    const topSong = sortedQueue[0];
-    return topSong ? {
-      uri: `spotify:track:${topSong.spotify_track_id}`,
-      title: topSong.title,
-      artist: topSong.artist,
-      albumArt: topSong.image_url,
-      duration_ms: topSong.duration_ms,
-      votes: topSong.voted_by ? topSong.voted_by.length : 0
-    } : null;
-  }, []);
-
-  // Memoize fetchQueue function
-  const fetchQueue = useCallback(async () => {
-    if (!roomId) return;
-
-    try {
-      const response = await fetch(`http://127.0.0.1:5000/api/room/${roomId}/queue`);
-      const data = await response.json();
-      console.log("[Queue] Fetched queue:", data);
-      setQueue(data.queue || []);
-      
-      // Set initial current song from queue only if there isn't one
-      if (!currentSong) {
-        const topSong = getTopVotedSong(data.queue);
-        if (topSong) {
-          console.log("[Queue] Setting initial current song:", topSong);
-          setCurrentSong(topSong);
-        }
-      }
-    } catch (error) {
-      console.error("[Queue] Error fetching queue:", error);
-      setError('Failed to fetch song queue');
-    }
-  }, [roomId, currentSong, getTopVotedSong]);
 
   // Extract song data from URL
   const extractSongData = useCallback(async (url) => {
@@ -457,7 +398,7 @@ const RoomPage = () => {
     if (!songInput.trim() || !socketRef.current) return;
 
     try {
-      setIsLoading(true);
+      
       const songData = await extractSongData(songInput);
       
       if (songData) {
@@ -473,12 +414,12 @@ const RoomPage = () => {
       console.error('[Queue] Failed to add song:', error);
       setError('Failed to add song to queue');
     } finally {
-      setIsLoading(false);
+    
     }
   }, [songInput, roomId, userId, extractSongData]);
 
-  // Update handleNextSong to request next song from queue
-  const handleNextSong = useCallback(() => {
+  // Request next song from queue
+  const requestNextSong = useCallback(() => {
     if (userRole === 'host' && socketRef.current) {
       console.log('[Socket.IO] Requesting next song from queue');
       socketRef.current.emit('get_next_song', {
@@ -536,7 +477,7 @@ const RoomPage = () => {
           <WebPlayback
             accessToken={spotifyToken}
             currentSong={currentSong}
-            onNextSong={handleNextSong}
+            onNextSong={requestNextSong}
             roomId={roomId}
             socket={socketRef.current}
           />
