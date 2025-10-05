@@ -1,49 +1,49 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const LandingPage = () => {
+  const [scrolled, setScrolled] = useState(false);
+
+  // Handle header scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
-    <div className="card">
-      <h2>Welcome to TopTrack</h2>
-      <p>Create music jam sessions where everyone can add songs and vote for their favorites!</p>
-      
-      <div className="landing-options">
-        <div className="option-card">
-          <div className="option-icon">🎤</div>
-          <h2>Create a Room</h2>
-          <p>Start a new jam session. You'll need Spotify Premium to host and control playback.</p>
-          <Link to="/create" className="btn">Create Room</Link>
+    <div className="landing-page">
+      {/* Animated Background */}
+      <div className="wave-background"></div>
+
+      {/* Header */}
+      <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
+        <Link to="/" className="logo">TopTrack</Link>
+      </header>
+
+      {/* Hero Section */}
+      <div className="hero-section">
+        <h1 className="hero-title">Collaborative Music Experience</h1>
+        <p className="hero-subtitle">
+          Start a new music session or jump into an existing one.
+        </p>
+
+        <div className="hero-buttons">
+          <Link to="/create" className="btn">Create Session</Link>
+          <Link to="/join" className="btn btn-secondary">Join Session</Link>
         </div>
         
-        <div className="option-card">
-          <div className="option-icon">🎵</div>
-          <h2>Join a Room</h2>
-          <p>Join an existing jam session using a room code or link. No Spotify account required!</p>
-          <Link to="/join" className="btn btn-secondary">Join Room</Link>
-        </div>
+        <p className="prerequisite-text">Requires Spotify Premium to host</p>
       </div>
       
-      <div style={{ marginTop: '40px', textAlign: 'center', color: '#666' }}>
-        <h3>How it works:</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginTop: '20px' }}>
-          <div>
-            <div style={{ fontSize: '2rem' }}>1️⃣</div>
-            <p>Create or join a room</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem' }}>2️⃣</div>
-            <p>Add songs from Spotify/YouTube</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem' }}>3️⃣</div>
-            <p>Vote for your favorites</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem' }}>4️⃣</div>
-            <p>Enjoy the music together!</p>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 };

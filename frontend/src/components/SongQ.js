@@ -67,6 +67,14 @@ const SongQ = ({ roomId, userId, socket }) => {
     if (data.user_id === userId) {
         setUserVoteSongId(data.vote_type === 'removed' ? null : data.song_id);
     }};
+    const handleSongRemoved = (data) => {
+    console.log('[Socket.IO] Song removed event received:', data);
+    if (!data || !data.song_id) {
+        console.error('[Socket.IO] Invalid song removal data received');
+        return;
+    }
+    setSongs(prev => prev.filter(song => song.id !== data.song_id));
+    };
 
     // Fetch initial queue
     fetchQueue();
@@ -74,7 +82,7 @@ const SongQ = ({ roomId, userId, socket }) => {
     // Set up socket event listeners
     socket.on('song_added', handleSongAdded);
     socket.on('song_voted', handleSongVoted);
-
+    socket.on('song_removed', handleSongRemoved);
 
     // Cleanup function
     return () => {

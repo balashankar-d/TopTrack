@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -73,59 +73,71 @@ const JoinRoom = () => {
   };
 
   return (
-    <div className="card">
-      <h2>Join a Room</h2>
-      <p>Enter the room details to join an existing jam session!</p>
+    <div className="landing-page">
+      {/* Animated Background */}
+      <div className="wave-background"></div>
 
-      <div className="form-group">
-        <label htmlFor="username">Your Name</label>
-        <input
-          type="text"
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Enter your display name"
-          className="form-input"
-          disabled={isLoading}
-        />
+      {/* Header */}
+      <header className="header">
+        <Link to="/" className="logo">TopTrack</Link>
+      </header>
+
+      <div className="room-form">
+        <h1 className="room-title">Join a Session</h1>
+        <p className="room-subtitle">Enter the session details to join an existing music experience</p>
+
+        <div className="card">
+          <div className="form-group">
+            <label htmlFor="username">Your Name</label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="What should we call you?"
+              className="form-input"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="roomInput">Session ID or Link</label>
+            <input
+              type="text"
+              id="roomInput"
+              value={roomInput}
+              onChange={handleInputChange}
+              placeholder="Enter session ID or paste session link"
+              className="form-input"
+              disabled={isLoading}
+            />
+            <small className="form-help">
+              You can paste the full room link or just the room ID
+            </small>
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button 
+            className="btn"
+            onClick={handleJoinRoom}
+            style={{width: '100%'}}
+            disabled={!roomInput.trim() || !username.trim() || isLoading}
+          >
+            {isLoading ? 'Joining...' : 'Join Session'}
+          </button>
+
+          <div className="info-box">
+            <h4>About Joining</h4>
+            <ul>
+              <li>No account required to join</li>
+              <li>Add songs to the queue</li>
+              <li>Vote for your favorites</li>
+              <li>Chat with other participants</li>
+            </ul>
+          </div>
+        </div>
       </div>
-
-      <div className="form-group">
-        <label htmlFor="roomInput">Room ID or Link</label>
-        <input
-          type="text"
-          id="roomInput"
-          value={roomInput}
-          onChange={handleInputChange}
-          placeholder="Enter room ID or paste room link"
-          className="form-input"
-          disabled={isLoading}
-        />
-        <small className="form-help">
-          You can paste the full room link or just the room ID
-        </small>
-      </div>
-
-      {error && <div className="error-message">{error}</div>}
-
-      <button 
-        className="btn"
-        onClick={handleJoinRoom}
-        disabled={!roomInput.trim() || !username.trim() || isLoading}
-      >
-        {isLoading ? 'Joining...' : 'Join Room'}
-      </button>
-
-      <div className="info-box">
-        <h4>Joining a Room</h4>
-        <ul>
-          <li>No account required to join</li>
-          <li>Add songs to the queue</li>
-          <li>Vote for your favorites</li>
-          <li>Chat with other participants</li>
-        </ul>
-      </div>
-
     </div>
   );
 };

@@ -651,6 +651,7 @@ def handle_get_next_song(data):
                 'youtube_url': next_song.youtube_url
             }
         }, room=room_id)
+        emit('song_removed', {'song_id': next_song.id, 'room_id': room_id}, room=room_id)
     else:
         print(f"No more songs in queue for room {room_id}")
         emit('next_song', {'song': None}, room=room_id)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
 const CreateRoom = () => {
@@ -11,6 +11,7 @@ const CreateRoom = () => {
   // Remove the useEffect that fetches authUrl - we'll fetch it when needed
 
   // Add error handling for Spotify callback errors
+  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get('error');
@@ -57,91 +58,63 @@ const CreateRoom = () => {
     }
   };
 
-  const handleCreateRoom = async () => {
-    if (!roomName.trim()) {
-      setError('Please enter a room name');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const tempHostId = 'demo_host_' + Date.now();
-      
-      const response = await axios.post('http://localhost:5000/api/rooms', {
-        name: roomName,
-        host_id: tempHostId
-      });
-
-      // Store host info
-      localStorage.setItem('userId', tempHostId);
-      localStorage.setItem('username', 'Demo Host');
-      localStorage.setItem('userRole', 'host');
-
-      // Navigate to room
-      navigate(`/room/${response.data.room_id}`);
-    } catch (error) {
-      setError('Failed to create room. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
-    <div className="card">
-      <h2>Create a Room</h2>
-      <p>Start your music jam session and invite friends to join!</p>
+    <div className="landing-page">
+      {/* Animated Background */}
+      <div className="wave-background"></div>
 
-      <div className="form-group">
-        <label htmlFor="roomName">Room Name</label>
-        <input
-          type="text"
-          id="roomName"
-          value={roomName}
-          onChange={(e) => setRoomName(e.target.value)}
-          placeholder="Enter room name (e.g., Friday Night Vibes)"
-          className="form-input"
-          disabled={isLoading}
-        />
-      </div>
+      {/* Header */}
+      <header className="header">
+        <Link to="/" className="logo">TopTrack</Link>
+      </header>
 
-      {error && <div className="error-message">{error}</div>}
+      <div className="room-form">
+        <h1 className="room-title">Create a Session</h1>
+        <p className="room-subtitle">Start your music experience and invite friends to join</p>
 
-      <div className="auth-section">
-        <h3>Authentication Required</h3>
-        <p>As a host, you need Spotify Premium to control playback</p>
-        
-        <div className="auth-options">
-          <button 
-            className="btn spotify-btn"
-            onClick={handleSpotifyLogin}
-            disabled={!roomName.trim() || isLoading}
-          >
-            <span>🎵</span>
-            {isLoading ? 'Connecting...' : 'Connect with Spotify Premium'}
-          </button>
-          
-          <div className="divider">OR</div>
-          
-          <button 
-            className="btn btn-secondary"
-            onClick={handleCreateRoom}
-            disabled={!roomName.trim() || isLoading}
-          >
-            {isLoading ? 'Creating...' : 'Create Room (Demo Mode)'}
-          </button>
+        <div className="card">
+          <div className="form-group">
+            <label htmlFor="roomName">Session Name</label>
+            <input
+              type="text"
+              id="roomName"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Enter a name for your session"
+              className="form-input"
+              disabled={isLoading}
+            />
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <div className="auth-section">
+            <p className="prerequisite-text" style={{marginBottom: '20px'}}>You'll need Spotify Premium to host this session</p>
+            
+            <div className="auth-options">
+              <button 
+                className="btn spotify-btn"
+                onClick={handleSpotifyLogin}
+                disabled={!roomName.trim() || isLoading}
+                style={{width: '100%'}}
+              >
+                <span>🎵</span>
+                {isLoading ? 'Connecting...' : 'Connect with Spotify Premium'}
+              </button>
+            </div>
+          </div>
+
+          <div className="info-box">
+            <h4>Why Spotify Premium?</h4>
+            <ul>
+              <li>Control playback in the room</li>
+              <li>Queue songs automatically</li>
+              <li>Sync with all participants</li>
+              <li>High-quality streaming</li>
+            </ul>
+          </div>
         </div>
-      </div>
-
-      <div className="info-box">
-        <h4>Why Spotify Premium?</h4>
-        <ul>
-          <li>Control playback in the room</li>
-          <li>Queue songs automatically</li>
-          <li>Sync with all participants</li>
-          <li>High-quality streaming</li>
-        </ul>
       </div>
     </div>
   );

@@ -42,7 +42,6 @@ const RoomPage = () => {
   const [userId, setUserId] = useState(() => sessionStorage.getItem('userId'));
   const [username, setUsername] = useState(() => sessionStorage.getItem('username'));
   const [userRole, setUserRole] = useState(() => sessionStorage.getItem('userRole') || 'member');
-  
   const [spotifyToken, setSpotifyToken] = useState(null);
   const [tokenExpiresAt, setTokenExpiresAt] = useState(null);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -78,6 +77,26 @@ const RoomPage = () => {
       cleanup();
     };
   }, [cleanup, isLeaving]);
+
+  useEffect(() => {
+  const fetchRoomDetails = async () => {
+    try {
+      // Fetch room details from API
+      const roomResponse = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+      if (!roomResponse.ok) {
+        throw new Error('Failed to fetch room details');
+      }
+      const roomData = await roomResponse.json();
+      setRoom(roomData.room);
+    } catch (error) {
+      console.error('[Room] Error fetching room details:', error);
+      setError('Failed to load room details');
+    }
+  };
+
+  fetchRoomDetails();
+  // rest of your existing effect code...
+}, [roomId]);
 
   // Validate user session
   useEffect(() => {
@@ -458,13 +477,20 @@ const RoomPage = () => {
   return (
     <div className="room-page">
       <div className="room-header">
-        <div className="header-content">
-          <h1>{room?.name || 'Music Room'}</h1>
-          <p>Room ID: {roomId}</p>
-          <p>Welcome, {username}! ({userRole})</p>
+        <div className="header-left">
+          <h1 className="brand-name"><span className="brand-icon">♫</span> TopTrack</h1>
+          <div className="room-details">
+            <h2>{room?.name || 'Music Room'}</h2>
+            <p>Room ID: {roomId}</p>
+          </div>
         </div>
-        <div className="leave-room">
-          <button onClick={handleLeaveRoom}>Leave Room</button>
+        <div className="header-right">
+          <div className="leave-room">
+            <button onClick={handleLeaveRoom}>
+              <span className="leave-icon">↩</span> Leave Room
+            </button>
+          </div>
+          <p className="user-welcome">Welcome, <span className="username">{username}</span> <span className="user-role">({userRole})</span></p>
         </div>
       </div>
 
@@ -483,8 +509,23 @@ const RoomPage = () => {
           />
         ) : currentSong ? (
           <div className="song-info">
-            <h3>{currentSong.title}</h3>
-            <p>{currentSong.artist}</p>
+            <div className="song-info__album">
+              {currentSong.albumArt && <img src={currentSong.albumArt} alt={`${currentSong.title} album art`} />}
+            </div>
+            <div className="song-info__details">
+              <h3 className="song-info__title">{currentSong.title}</h3>
+              <p className="song-info__artist">{currentSong.artist}</p>
+              {currentSong.duration_ms && (
+                <p className="song-info__duration">
+                  <span className="duration-icon">⏱</span> {Math.floor(currentSong.duration_ms / 60000)}:{String(Math.floor((currentSong.duration_ms % 60000) / 1000)).padStart(2, '0')}
+                </p>
+              )}
+              <div className="song-info__progress-container">
+                <div className="song-info__progress-bar">
+                  <div className="song-info__progress-fill"></div>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <p>No song currently playing</p>
