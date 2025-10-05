@@ -13,28 +13,51 @@ import urllib.parse
 from dotenv import load_dotenv
 import requests
 
-# Load environment variables
+# Add this at the start of your app.py after imports
+def validate_env_vars():
+    """Validate that required environment variables are set"""
+    required_vars = ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET', 'SECRET_KEY']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"ERROR: Missing required environment variables: {', '.join(missing_vars)}")
+        print("Please set these environment variables in your Render dashboard")
+        # In development, we can continue with warnings
+        if os.getenv('FLASK_ENV') != 'development':
+            import sys
+            sys.exit(1)
+
+# Call this function before initializing the app
+validate_env_vars()
+
 load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
+database_url = os.getenv('DATABASE_URL', 'sqlite:///toptrack.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///toptrack.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Spotify Configuration
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
+SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:5000/callback")
 SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-email user-read-private"
 
+
+
 CORS(app, 
-     origins=['http://localhost:3000', 'http://127.0.0.1:3000'],
+     origins=['http://localhost:3000', 'http://127.0.0.1:3000', FRONTEND_URL],
      allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 # Initialize extensions
 db = SQLAlchemy(app)
 socketio = SocketIO(app, 
-                   cors_allowed_origins=['http://localhost:3000', 'http://127.0.0.1:3000'],async_mode="gevent"
+                   cors_allowed_origins=['http://localhost:3000', 'http://127.0.0.1:3000', FRONTEND_URL], async_mode="gevent"
                    )
 
 
@@ -100,6 +123,28 @@ class SpotifyToken(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # REST API Endpoints
+@app.before_request
+def log_request_info():
+    if os.getenv('FLASK_ENV') == 'development':
+        print('Headers: %s' % request.headers)
+        print('Body: %s' % request.get_data())
+
+@app.after_request
+def log_response_info(response):
+    if os.getenv('FLASK_ENV') == 'development' and response.status_code >= 400:
+        print('Response: %s' % response.get_data())
+    return response
+
+@app.route('/api/health')
+def health_check():
+    try:
+        # Test database connection
+        db.session.execute("SELECT 1")
+        return jsonify({'status': 'ok', 'database': 'connected'}), 200
+    except Exception as e:
+        print(f"Health check failed: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # Spotify Authentication Endpoints
 @app.route("/api/spotify-login")
@@ -109,7 +154,7 @@ def spotify_login():
     params = {
         "client_id": SPOTIFY_CLIENT_ID,
         "response_type": "code",
-        "redirect_uri": "http://127.0.0.1:5000/callback",  # Updated to match callback
+        "redirect_uri": SPOTIFY_REDIRECT_URI,  # Updated to match callback
         "scope": SCOPES,
         "state": room_name  # Pass room name as state parameter
     }
@@ -124,14 +169,14 @@ def spotify_callback():
     if error:
         error_description = request.args.get('error_description', 'Unknown error')
         print(f"Spotify auth error: {error} - {error_description}")
-        return redirect(f"http://localhost:3000/create?error=spotify_error&message={error_description}")
+        return redirect(f"{FRONTEND_URL}/create?error=spotify_error&message={error_description}")
     
     code = request.args.get('code')
     if not code:
         print("No authorization code received")
-        return redirect(f"http://localhost:3000/create?error=missing_code&message=No authorization code received")
+        return redirect(f"{FRONTEND_URL}/create?error=missing_code&message=No authorization code received")
 
-    redirect_uri = "http://127.0.0.1:5000/callback"
+    redirect_uri = SPOTIFY_REDIRECT_URI
 
     try:
         auth_string = f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}"
@@ -155,8 +200,8 @@ def spotify_callback():
         
         if token_response.status_code != 200:
             print(f"Token exchange failed: {token_response.status_code} - {token_response.text}")
-            return redirect(f"http://localhost:3000/create?error=token_failed&message=Failed to exchange code for token")
-        
+            return redirect(f"{FRONTEND_URL}/create?error=token_failed&message=Failed to exchange code for token")
+
         token_data = token_response.json()
         print(f"Token received successfully")
         
@@ -169,7 +214,7 @@ def spotify_callback():
         
         if profile_response.status_code != 200:
             print(f"Profile fetch failed: {profile_response.status_code} - {profile_response.text}")
-            return redirect(f"http://localhost:3000/create?error=profile_failed&message=Failed to get Spotify profile")
+            return redirect(f"{FRONTEND_URL}/create?error=profile_failed&message=Failed to get Spotify profile")
         
         profile_data = profile_response.json()
         spotify_user_id = profile_data['id']
@@ -216,7 +261,7 @@ def spotify_callback():
         print(f"Spotify User: {spotify_user_id}")
         print(f"Display Name: {display_name}")
 
-        final_url = f"http://localhost:3000/room/{room.id}?spotify_user={spotify_user_id}&display_name={display_name}&auth_success=true"
+        final_url = f"{FRONTEND_URL}/room/{room.id}?spotify_user={spotify_user_id}&display_name={display_name}&auth_success=true"
         print(f"Final redirect URL: {final_url}")
         print("=====================")
 
@@ -228,7 +273,7 @@ def spotify_callback():
         print(f"Callback error: {str(e)}")
         # Sanitize error message for redirect
         error_message = str(e).replace('\n', ' ').replace('\r', ' ')
-        return redirect(f"http://localhost:3000/create?error=server_error&message=Authentication failed: {error_message}")
+        return redirect(f"{FRONTEND_URL}/create?error=server_error&message=Authentication failed: {error_message}")
 
 
 @app.route('/api/spotify/track-info', methods=['POST'])
@@ -745,4 +790,8 @@ def get_room_spotify_token(room_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    # Use environment variables for host and port
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV', 'production') != 'production'
+    
+    socketio.run(app, debug=debug, host='0.0.0.0', port=port)
