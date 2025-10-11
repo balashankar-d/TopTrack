@@ -16,7 +16,7 @@ services:
           Referrer-Policy: strict-origin-when-cross-origin
     envVars:
       - key: REACT_APP_API_URL
-        value: https://your-backend-url.onrender.com
+        value: https://toptrack.onrender.com
       - key: NODE_ENV
         value: production
     pullRequestPreviewsEnabled: true
