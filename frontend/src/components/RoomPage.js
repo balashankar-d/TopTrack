@@ -6,11 +6,11 @@ import SongQ from './SongQ';
 import WebPlayback from './webplayback';
 import { v4 as uuidv4 } from 'uuid';
 import './RoomPage.css';
-
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 // Spotify token management
 export const getSpotifyToken = async (roomId) => {
   try {
-    const response = await axios.get(`http://127.0.0.1:5000/api/spotify/token/room/${roomId}`);
+    const response = await axios.get(`${API_URL}/api/spotify/token/room/${roomId}`);
     return {
       accessToken: response.data.access_token,
       expiresIn: response.data.expires_in
@@ -82,7 +82,7 @@ const RoomPage = () => {
   const fetchRoomDetails = async () => {
     try {
       // Fetch room details from API
-      const roomResponse = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+      const roomResponse = await fetch(`${API_URL}/api/rooms/${roomId}`);
       if (!roomResponse.ok) {
         throw new Error('Failed to fetch room details');
       }
@@ -204,7 +204,7 @@ const RoomPage = () => {
       userRole
     });
 
-    const socket = io("http://127.0.0.1:5000", {
+    const socket = io(API_URL, {
       transports: ['websocket'],
       withCredentials: true,
       reconnection: true,
@@ -391,7 +391,7 @@ const RoomPage = () => {
     }
 
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/spotify/track-info', {
+      const response = await axios.post(`${API_URL}/api/spotify/track-info`, {
         spotify_url: url,
         room_id: roomId
       });

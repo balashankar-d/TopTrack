@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './SongQ.css';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const SongQ = ({ roomId, userId, socket }) => {
   const [songs, setSongs] = useState([]);
@@ -16,7 +17,7 @@ const SongQ = ({ roomId, userId, socket }) => {
 
     const fetchQueue = async () => {
         try {
-            const res = await fetch(`http://localhost:5000/api/room/${roomId}/queue`);
+            const res = await fetch(`${API_URL}/api/room/${roomId}/queue`);
             const data = await res.json();
             console.log('[Queue] Fetched initial queue:', data.songs);
             setSongs(data.songs || []);

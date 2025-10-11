@@ -28,9 +28,10 @@ def validate_env_vars():
             sys.exit(1)
 
 # Call this function before initializing the app
-validate_env_vars()
+
 
 load_dotenv()
+validate_env_vars()
 
 # Initialize Flask app
 app = Flask(__name__)

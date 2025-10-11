@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const CreateRoom = () => {
   const [roomName, setRoomName] = useState('');
@@ -35,8 +36,8 @@ const CreateRoom = () => {
 
     try {
       // Fetch auth URL with the room name
-      const response = await fetch(`http://localhost:5000/api/spotify-login?room_name=${encodeURIComponent(roomName)}`);
-      
+      const response = await fetch(`${API_URL}/api/spotify-login?room_name=${encodeURIComponent(roomName)}`);
+
       if (!response.ok) {
         throw new Error('Failed to get Spotify login URL');
       }

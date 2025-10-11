@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const JoinRoom = () => {
   const [roomInput, setRoomInput] = useState('');
   const [username, setUsername] = useState('');
@@ -36,8 +38,8 @@ const JoinRoom = () => {
       const roomId = extractRoomId(roomInput);
       
       // Check if room exists
-      const response = await axios.get(`http://localhost:5000/api/rooms/${roomId}`);
-      
+      const response = await axios.get(`${API_URL}/api/rooms/${roomId}`);
+
       if (!response.data.room.is_active) {
         setError('This room is no longer active');
         return;
